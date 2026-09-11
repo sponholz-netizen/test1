@@ -663,22 +663,30 @@ c-34 7 -66 22 -110 51 -32 21 -30 14 12 -43 24 -32 124 -88 176 -98 15 -3 27
     msg.style.display = 'none';
     btn.disabled = true;
     btn.textContent = 'Wird gesendet…';
+
+    var controller = new AbortController();
+    var timeout = setTimeout(function(){ controller.abort(); }, 12000);
+
     fetch(form.action, {
       method: 'POST',
       headers: { 'Accept': 'application/json' },
-      body: new FormData(form)
+      body: new FormData(form),
+      signal: controller.signal
     }).then(function(res){
-      if(res.ok){
-        msg.textContent = 'Vielen Dank! Ihre Nachricht wurde erfolgreich versendet. Wir melden uns zeitnah bei Ihnen.';
-        msg.className = 'form-msg ok';
-        form.reset();
-      } else {
-        throw new Error('send failed');
-      }
-    }).catch(function(){
+      clearTimeout(timeout);
+      if(!res.ok){ throw new Error('send failed: HTTP ' + res.status); }
+      return res.json().catch(function(){ return {}; });
+    }).then(function(data){
+      if(data && data.success === false){ throw new Error('send failed: ' + (data.message || 'unknown')); }
+      msg.textContent = 'Vielen Dank! Ihre Nachricht wurde erfolgreich versendet. Wir melden uns zeitnah bei Ihnen.';
+      msg.className = 'form-msg ok';
+      form.reset();
+    }).catch(function(err){
+      console.error('Kontaktformular-Versand fehlgeschlagen:', err);
       msg.textContent = 'Leider ist etwas schiefgelaufen. Bitte schreiben Sie uns direkt an ware@ashbird.de.';
       msg.className = 'form-msg err';
     }).finally(function(){
+      clearTimeout(timeout);
       btn.disabled = false;
       btn.textContent = 'Nachricht senden';
     });
